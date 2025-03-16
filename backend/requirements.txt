@@ -1,0 +1,15 @@
+# Django backend requirements
+Django==5.0.2
+django-cors-headers==4.3.1
+djangorestframework==3.14.0
+python-dotenv==1.0.0
+
+# Existing RAG system dependencies
+chromadb
+cohere
+google-generativeai
+PyPDF2
+docx2txt
+tqdm
+numpy
+pandas

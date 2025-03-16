@@ -1,0 +1,33 @@
+# Core dependencies
+python-dotenv
+pydantic
+
+# Google Gemini API for text generation
+google-generativeai
+
+# Cohere API for embeddings
+cohere
+
+# Vector database
+chromadb
+
+# Document processing
+PyPDF2
+docx2txt
+
+# Web interface
+streamlit
+# Optional API components
+fastapi
+uvicorn
+python-multipart
+
+# Async support
+asyncio
+aiohttp
+
+# Utilities
+tqdm
+numpy
+pandas
+chromadb
