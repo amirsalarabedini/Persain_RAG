@@ -14,7 +14,8 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
-  Chip
+  Chip,
+  Box
 } from '@mui/material';
 import { ExpandMore as ExpandMoreIcon } from '@mui/icons-material';
 import axios from 'axios';
@@ -59,63 +60,61 @@ const QueryHistoryPage = () => {
 
   return (
     <div>
-      <Typography variant="h4" gutterBottom>
-        Query History
-      </Typography>
-      <Typography variant="subtitle1" paragraph>
-        View the history of queries made to the RAG system.
-      </Typography>
+      <Box sx={{ mb: 4 }}>
+        <Typography variant="h4" gutterBottom fontWeight="600">
+          Query History
+        </Typography>
+        <Typography variant="subtitle1" paragraph sx={{ opacity: 0.8 }}>
+          View the history of queries made to the RAG system.
+        </Typography>
+      </Box>
 
       {queryHistory.length === 0 ? (
-        <Paper elevation={2} sx={{ p: 3, textAlign: 'center' }}>
-          <Typography variant="body1">
+        <Paper 
+          elevation={0} 
+          sx={{ 
+            p: 4, 
+            textAlign: 'center',
+            border: '1px solid',
+            borderColor: 'rgba(0, 0, 0, 0.06)',
+            borderRadius: 3
+          }}
+        >
+          <Typography variant="body1" color="text.secondary">
             No query history found. Try making some queries first.
           </Typography>
         </Paper>
       ) : (
-        <TableContainer component={Paper}>
+        <TableContainer 
+          component={Paper}
+          elevation={0}
+          sx={{ 
+            border: '1px solid',
+            borderColor: 'rgba(0, 0, 0, 0.06)',
+            borderRadius: 3,
+            overflow: 'hidden'
+          }}
+        >
           <Table>
             <TableHead>
               <TableRow>
                 <TableCell>Query</TableCell>
                 <TableCell>Timestamp</TableCell>
-                <TableCell>Documents Retrieved</TableCell>
-                <TableCell>Details</TableCell>
+                <TableCell>Response</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {queryHistory.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell>{item.query_text.length > 50 ? `${item.query_text.substring(0, 50)}...` : item.query_text}</TableCell>
+                  <TableCell>{item.query}</TableCell>
                   <TableCell>{new Date(item.timestamp).toLocaleString()}</TableCell>
-                  <TableCell>
-                    {item.documents_retrieved && item.documents_retrieved.length > 0 ? (
-                      item.documents_retrieved.map((doc) => (
-                        <Chip 
-                          key={doc.id} 
-                          label={doc.title} 
-                          size="small" 
-                          sx={{ mr: 0.5, mb: 0.5 }} 
-                        />
-                      ))
-                    ) : (
-                      <Typography variant="body2" color="textSecondary">None</Typography>
-                    )}
-                  </TableCell>
                   <TableCell>
                     <Accordion>
                       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                         <Typography>View Response</Typography>
                       </AccordionSummary>
                       <AccordionDetails>
-                        <Card>
-                          <CardContent>
-                            <Typography variant="h6" gutterBottom>Response</Typography>
-                            <Paper elevation={0} sx={{ p: 2, bgcolor: '#f5f5f5' }}>
-                              <ReactMarkdown>{item.response_text}</ReactMarkdown>
-                            </Paper>
-                          </CardContent>
-                        </Card>
+                        <ReactMarkdown>{item.response}</ReactMarkdown>
                       </AccordionDetails>
                     </Accordion>
                   </TableCell>

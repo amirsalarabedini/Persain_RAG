@@ -64,7 +64,12 @@ data/chroma/
 .env.*
 !.env.example
 
-#documents
-documents/
+
+
+# Ignore all files in a directory
 documents/*
 !documents/.gitkeep
+
+# Ignored all in data 
+data/*
+!data/.gitkeep

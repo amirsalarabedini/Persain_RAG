@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { AppBar, Box, Drawer, Toolbar, Typography, List, ListItem, ListItemIcon, ListItemText, Container, Divider } from '@mui/material';
+import { AppBar, Box, Drawer, Toolbar, Typography, List, ListItem, ListItemIcon, ListItemText, Container, Divider, useTheme, alpha } from '@mui/material';
 import { Dashboard as DashboardIcon, Description as DocumentIcon, QuestionAnswer as QueryIcon, History as HistoryIcon } from '@mui/icons-material';
 
 const drawerWidth = 240;
@@ -20,7 +20,7 @@ const Layout = ({ children }) => {
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
           <Typography variant="h6" noWrap component="div">
-            RAG System
+            Ayandejoo
           </Typography>
         </Toolbar>
       </AppBar>
