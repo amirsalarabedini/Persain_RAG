@@ -1,5 +1,3 @@
-# Ayandejo RAG System
-
 A Retrieval-Augmented Generation (RAG) system built with Google's Gemini API for text generation and Cohere for embeddings.
 
 ## Features
