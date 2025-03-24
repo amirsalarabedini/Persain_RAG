@@ -154,7 +154,3 @@ TOP_K_RESULTS=5
 - `data/`: Directory for storing processed data
 - `.env`: Environment variables and configuration
 - `requirements.txt`: Project-level Python dependencies
-
-## License
-
-MIT
