@@ -1,4 +1,4 @@
-# Ayandejo - A Modern RAG System
+# Persain RAG - A Modern Retrieval-Augmented Generation System
 
 A Retrieval-Augmented Generation (RAG) system built with a Django backend and React frontend. The system uses Google's Gemini API for text generation and Cohere for embeddings.
 
@@ -71,10 +71,6 @@ CHROMA_PERSIST_DIRECTORY=./data/chroma
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
 TOP_K_RESULTS=5
-
-# Django Settings (optional)
-DJANGO_SECRET_KEY=your_secret_key_here
-DJANGO_DEBUG=True
 ```
 
 ## Usage
