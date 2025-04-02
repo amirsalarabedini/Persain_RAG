@@ -3,12 +3,13 @@ Django==5.0.2
 django-cors-headers==4.3.1
 djangorestframework==3.14.0
 python-dotenv==1.0.0
+pydantic==2.5.3
 
 # Document processing
 docling>=2.28.4
-PyPDF2
-docx2txt
-tqdm
+PyPDF2==3.0.1
+docx2txt==0.8
+tqdm==4.66.1
 
 # RAG system dependencies
 chromadb
