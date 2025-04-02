@@ -1,11 +1,13 @@
-"""Document processing module for the RAG system."""
+"""Document processing module for the RAG system using Docling."""
 
 import os
 from pathlib import Path
 from typing import List, Dict, Union, Optional
-import PyPDF2
-import docx2txt
 from tqdm import tqdm
+
+# Import Docling components
+from docling.document_converter import DocumentConverter
+from docling.pipeline import Pipeline
 
 from .rag_config import config
 
@@ -37,15 +39,18 @@ class DocumentChunk:
 
 
 class DocumentProcessor:
-    """Processes documents for the RAG system."""
+    """Processes documents for the RAG system using Docling."""
     
     def __init__(self, chunk_size: int = None, chunk_overlap: int = None):
         """Initialize the document processor with chunking parameters."""
         self.chunk_size = chunk_size or config.chunk_size
         self.chunk_overlap = chunk_overlap or config.chunk_overlap
+        
+        # Initialize Docling converter
+        self.converter = DocumentConverter()
     
     def load_document(self, file_path: Union[str, Path]) -> Union[Document, List[Document]]:
-        """Load a document from a file path.
+        """Load a document from a file path using Docling.
         
         For PDF files, returns a list of Documents (one per page).
         For other file types, returns a single Document.
@@ -56,25 +61,46 @@ class DocumentProcessor:
         
         file_extension = file_path.suffix.lower()
         
-        if file_extension == ".pdf":
-            # For PDFs, load with page tracking
-            return self._load_pdf_with_pages(file_path)
-        
-        # For non-PDF files, create a single document
-        metadata = {
+        # Base metadata for all document types
+        base_metadata = {
             "source": str(file_path),
             "filename": file_path.name,
             "file_type": file_extension[1:] if file_extension else "unknown"
         }
         
-        if file_extension == ".txt":
-            content = self._load_text(file_path)
-        elif file_extension in [".docx", ".doc"]:
-            content = self._load_docx(file_path)
-        else:
-            raise ValueError(f"Unsupported file type: {file_extension}")
-        
-        return Document(content=content, metadata=metadata)
+        # Use Docling to process the document
+        try:
+            # Convert the document using Docling
+            result = self.converter.convert(str(file_path))
+            
+            if file_extension == ".pdf" and hasattr(result.document, "pages"):
+                # For PDFs, create one document per page to maintain compatibility
+                documents = []
+                total_pages = len(result.document.pages)
+                
+                for i, page in enumerate(result.document.pages):
+                    # Extract page content as markdown for better structure preservation
+                    page_content = page.export_to_markdown()
+                    
+                    # Create metadata for the page
+                    page_metadata = base_metadata.copy()
+                    page_metadata.update({
+                        "page_num": i + 1,
+                        "total_pages": total_pages
+                    })
+                    
+                    documents.append(Document(content=page_content, metadata=page_metadata))
+                
+                return documents
+            else:
+                # For non-PDF files or when page information isn't available
+                content = result.document.export_to_markdown()
+                return Document(content=content, metadata=base_metadata)
+                
+        except Exception as e:
+            # Fallback to basic processing if Docling fails
+            print(f"Docling processing failed for {file_path}: {e}. Using basic fallback processing.")
+            return self._fallback_load_document(file_path, base_metadata)
     
     def load_documents(self, directory: Union[str, Path]) -> List[Document]:
         """Load all supported documents from a directory."""
@@ -83,7 +109,7 @@ class DocumentProcessor:
             raise NotADirectoryError(f"Directory not found: {directory}")
         
         documents = []
-        supported_extensions = [".pdf", ".txt", ".docx", ".doc"]
+        supported_extensions = [".pdf", ".txt", ".docx", ".doc", ".xlsx", ".pptx", ".html"]
         
         for file_path in tqdm(list(directory.glob("**/*")), desc="Loading documents"):
             if file_path.is_file() and file_path.suffix.lower() in supported_extensions:
@@ -138,38 +164,43 @@ class DocumentProcessor:
             all_chunks.extend(chunks)
         return all_chunks
     
-    def _load_pdf(self, file_path: Path) -> str:
-        """Load content from a PDF file."""
-        with open(file_path, "rb") as file:
-            reader = PyPDF2.PdfReader(file)
-            text = ""
-            for page in reader.pages:
-                text += page.extract_text() + "\n"
-            return text
-            
-    def _load_pdf_with_pages(self, file_path: Path) -> List[Document]:
-        """Load content from a PDF file with page tracking."""
-        documents = []
-        with open(file_path, "rb") as file:
-            reader = PyPDF2.PdfReader(file)
-            for i, page in enumerate(reader.pages):
-                content = page.extract_text()
-                if content.strip():  # Skip empty pages
-                    metadata = {
-                        "source": str(file_path),
-                        "filename": file_path.name,
-                        "file_type": "pdf",
-                        "page_num": i + 1,
-                        "total_pages": len(reader.pages)
-                    }
-                    documents.append(Document(content=content, metadata=metadata))
-        return documents
-    
-    def _load_text(self, file_path: Path) -> str:
-        """Load content from a text file."""
-        with open(file_path, "r", encoding="utf-8", errors="replace") as file:
-            return file.read()
-    
-    def _load_docx(self, file_path: Path) -> str:
-        """Load content from a DOCX file."""
-        return docx2txt.process(str(file_path))
+    def _fallback_load_document(self, file_path: Path, base_metadata: Dict) -> Union[Document, List[Document]]:
+        """Fallback method to load documents when Docling fails."""
+        file_extension = file_path.suffix.lower()
+        
+        if file_extension == ".pdf":
+            try:
+                import PyPDF2
+                documents = []
+                with open(file_path, "rb") as file:
+                    reader = PyPDF2.PdfReader(file)
+                    for i, page in enumerate(reader.pages):
+                        content = page.extract_text()
+                        if content.strip():  # Skip empty pages
+                            metadata = base_metadata.copy()
+                            metadata.update({
+                                "page_num": i + 1,
+                                "total_pages": len(reader.pages)
+                            })
+                            documents.append(Document(content=content, metadata=metadata))
+                return documents
+            except Exception as e:
+                print(f"Fallback PDF processing failed: {e}")
+                raise
+                
+        elif file_extension == ".txt":
+            with open(file_path, "r", encoding="utf-8", errors="replace") as file:
+                content = file.read()
+                return Document(content=content, metadata=base_metadata)
+                
+        elif file_extension in [".docx", ".doc"]:
+            try:
+                import docx2txt
+                content = docx2txt.process(str(file_path))
+                return Document(content=content, metadata=base_metadata)
+            except Exception as e:
+                print(f"Fallback DOCX processing failed: {e}")
+                raise
+                
+        else:
+            raise ValueError(f"Unsupported file type: {file_extension}")
