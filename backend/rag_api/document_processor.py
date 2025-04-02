@@ -7,7 +7,6 @@ from tqdm import tqdm
 
 # Import Docling components
 from docling.document_converter import DocumentConverter
-from docling.pipeline import Pipeline
 
 from .rag_config import config
 
@@ -73,34 +72,139 @@ class DocumentProcessor:
             # Convert the document using Docling
             result = self.converter.convert(str(file_path))
             
-            if file_extension == ".pdf" and hasattr(result.document, "pages"):
+            # Get the full document content
+            full_content = result.document.export_to_markdown()
+            
+            if file_extension == ".pdf" and hasattr(result.document, 'pages'):
                 # For PDFs, create one document per page to maintain compatibility
                 documents = []
-                total_pages = len(result.document.pages)
+                pages = result.document.pages
                 
-                for i, page in enumerate(result.document.pages):
-                    # Extract page content as markdown for better structure preservation
-                    page_content = page.export_to_markdown()
+                # Docling pages can be a dictionary with page numbers as keys
+                if isinstance(pages, dict):
+                    page_keys = sorted(pages.keys())
+                    total_pages = len(page_keys)
                     
-                    # Create metadata for the page
-                    page_metadata = base_metadata.copy()
-                    page_metadata.update({
-                        "page_num": i + 1,
-                        "total_pages": total_pages
-                    })
+                    # If the PDF has only one page or no page content, just use the full document
+                    if total_pages == 0 or (total_pages == 1 and not pages[page_keys[0]]):
+                        return Document(content=full_content, metadata=base_metadata)
                     
-                    documents.append(Document(content=page_content, metadata=page_metadata))
-                
-                return documents
+                    # Try to split the content by page markers
+                    import re
+                    page_markers = re.findall(r'# Page \d+', full_content)
+                    page_content_split = None
+                    
+                    if len(page_markers) >= len(page_keys):
+                        page_content_split = re.split(r'(?=# Page \d+)', full_content)
+                        # Remove the first element if it's empty (content before first page marker)
+                        if page_content_split and not page_content_split[0].strip():
+                            page_content_split = page_content_split[1:]
+                    
+                    for i, page_num in enumerate(page_keys):
+                        page = pages[page_num]
+                        
+                        # Try to get content from the page split if available
+                        if page_content_split and i < len(page_content_split):
+                            page_content = page_content_split[i]
+                        else:
+                            # Try to get content from the page object
+                            try:
+                                if hasattr(page, 'export_to_markdown'):
+                                    page_content = page.export_to_markdown()
+                                else:
+                                    # Create markdown from page elements
+                                    page_content = self._extract_page_content(page)
+                            except Exception as e:
+                                print(f"Error extracting page {page_num} content: {e}")
+                                # Use a placeholder for this page
+                                page_content = f"# Page {page_num}\n\n[Content extraction error]"
+                        
+                        # Create metadata for the page
+                        page_metadata = base_metadata.copy()
+                        page_metadata.update({
+                            "page_num": page_num,
+                            "total_pages": total_pages
+                        })
+                        
+                        documents.append(Document(content=page_content, metadata=page_metadata))
+                    
+                    return documents
+                else:
+                    # Create a single document from the entire PDF
+                    return Document(content=full_content, metadata=base_metadata)
             else:
                 # For non-PDF files or when page information isn't available
-                content = result.document.export_to_markdown()
-                return Document(content=content, metadata=base_metadata)
+                return Document(content=full_content, metadata=base_metadata)
                 
         except Exception as e:
             # Fallback to basic processing if Docling fails
             print(f"Docling processing failed for {file_path}: {e}. Using basic fallback processing.")
             return self._fallback_load_document(file_path, base_metadata)
+    
+    def _extract_page_content(self, page) -> str:
+        """Extract content from a Docling page when export_to_markdown is not available."""
+        content = []
+        
+        # Try to get the full document content as markdown
+        if hasattr(page, 'export_to_text'):
+            return page.export_to_text()
+            
+        # Get the document structure
+        if hasattr(page, 'body'):
+            # Just convert the entire document to markdown
+            result = self.converter.result
+            if result and hasattr(result, 'document'):
+                return result.document.export_to_markdown()
+        
+        # Extract text from the page
+        if hasattr(page, 'texts') and page.texts:
+            for text in page.texts:
+                if hasattr(text, 'text') and text.text:
+                    content.append(text.text)
+        
+        # Extract tables if present
+        if hasattr(page, 'tables') and page.tables:
+            for table in page.tables:
+                content.append("TABLE:")
+                if hasattr(table, 'cells') and table.cells:
+                    for cell in table.cells:
+                        if hasattr(cell, 'text') and cell.text:
+                            content.append(f"  - {cell.text}")
+        
+        # If still no content, try exporting raw page data
+        if not content and hasattr(page, 'dict'):
+            import json
+            try:
+                # Convert page data to JSON and back to extract text content
+                page_data = page.dict()
+                return f"Page data: {json.dumps(page_data, indent=2)}"
+            except Exception as e:
+                print(f"Error converting page data to JSON: {e}")
+        
+        # If still no content, use fallback with raw page attributes
+        if not content:
+            for attr in dir(page):
+                if not attr.startswith('_') and not callable(getattr(page, attr)):
+                    attr_value = getattr(page, attr)
+                    if isinstance(attr_value, str) and attr_value.strip():
+                        content.append(f"{attr}: {attr_value}")
+        
+        # If still no content, get full document markdown
+        if not content:
+            try:
+                doc = getattr(self.converter, 'result', None)
+                if doc and hasattr(doc, 'document'):
+                    doc_content = doc.document.export_to_markdown()
+                    # Split content by pages
+                    import re
+                    pages = re.split(r'(?=# Page \d+)', doc_content)
+                    if len(pages) > 1:
+                        return pages[1]  # First page content
+                    return doc_content
+            except Exception as e:
+                print(f"Error getting document content: {e}")
+        
+        return "\n".join(content) if content else "No content extracted from page"
     
     def load_documents(self, directory: Union[str, Path]) -> List[Document]:
         """Load all supported documents from a directory."""
